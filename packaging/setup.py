@@ -38,52 +38,10 @@ def template_packages():
     chdir('src')
 
 
-def installer():
-    """package app for target operating system"""
-
-    def package_windows():
-        call(split(
-            r"wine \Program Files (x86)\Inno Setup 5\ISCC.exe packaging\{NAME}.iss"
-            .format(NAME=NAME)
-        ))
-
-    def package_linux():
-        call(split(
-            "tar -C dist -caf dist/{NAME}.tar.bz2 {NAME} "
-            "--warning=no-file-changed".format(NAME=NAME)
-        ))
-
-    def package_osx():
-        call("installer=packaging/fix_osx_package.sh")
-        call(split(
-            "hdiutil create dist/{NAME}.dmg -srcfolder dist/{NAME}.app -ov"
-            .format(NAME=NAME)
-        ))
-
-    chdir('..')
-    if getenv('ComSpec') or getenv('WINEARCH'):
-        package_windows()
-    elif platform == 'osx':
-        package_osx()
-    elif platform in ('linux2', 'linux'):
-        package_linux()
-    else:
-        raise("Unknown platform!")
-    chdir('src')
-
 
 def xrmtree(path):
     if exists(path):
         rmtree(path)
-
-
-def package():
-    'call PyInstaller'
-    chdir('..')
-    xrmtree('dist')
-    xrmtree('build')
-    call(split('pyinstaller packaging/project.spec -y --clean'))
-    chdir('src')
 
 
 def condiment():
