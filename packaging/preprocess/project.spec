@@ -71,7 +71,7 @@ exe = EXE(
     icon=join('src', 'data', 'icons', 'icon.ico')
 )
 
-with open('packaging/blacklist.txt') as f:
+with open('packaging/blocklist.txt') as f:
     excludes = [x.strip() for x in f.readlines()]
 
 coll = COLLECT(

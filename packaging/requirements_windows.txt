@@ -1,7 +1,7 @@
 pycryptodomex
-Cython==0.26
-kivy.deps.sdl2
-kivy.deps.glew
+Cython>=0.29
+kivy_deps.sdl2
+kivy_deps.glew
 versiontools>=1.9.1
 pip
 raven>=5.18

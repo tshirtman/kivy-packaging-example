@@ -1,25 +1,34 @@
-from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Build import cythonize
-from Cython.Distutils import build_ext
+from setuptools import setup, Extension
+
 from glob import glob
-from os.path import basename, join, exists
+from os.path import basename, join, exists, isdir
+from os import walk, unlink, write, getenv, chdir, dup2, dup, fdopen, close, mkdir
 from sys import platform, stdout, exit
 from tempfile import mkstemp, TemporaryFile
-from os import walk, unlink, write, getenv, chdir, dup2, dup, fdopen, close
 from shutil import move, rmtree
-from kivy.atlas import Atlas
-from condiment import Parser
-from jinja2 import Template
-from subprocess import call
-from shlex import split
-from contextlib import contextmanager
+
+# from subprocess import call
+# from shlex import split
+# from contextlib import contextmanager
+
 import sys
 import io
+import logging
+
+from jinja2 import Template
+from Cython.Build import cythonize
+from Cython.Distutils import build_ext
+
+from kivy.atlas import Atlas
+from condiment import Parser
+
+log = logging.getLogger(__name__)
 
 
 DEV = getenv('WITH_DEV')
 NAME = getenv('WITH_NAME', 'Application')
+
+__version__ = '1.0'
 
 
 def template_packages():
@@ -31,7 +40,7 @@ def template_packages():
     for s in templates:
         with open('packaging/preprocess/{}'.format(s)) as f:
             t = Template(f.read())
-            output = t.render({'NAME': NAME, 'VERSION': version})
+            output = t.render({'NAME': NAME, 'VERSION': __version__})
             with open('packaging/{}'.format(s), 'w') as out:
                 out.write(output)
 
@@ -54,7 +63,7 @@ def condiment():
     ]
     for t in targets:
         if not exists(t):
-            print("{} doesn't exist, skipping".format(t))
+            log.info("{} doesn't exist, skipping".format(t))
             continue
 
         source = '{}'.format(t)
@@ -72,30 +81,33 @@ def make_atlas():
 
     sources = [
         'src/data/*.png',
-        'src/data/menu/menu_*.png',
-        'src/data/keys/*.png',
-        'src/data/icons/*.png',
-        'src/data/mone/*.png',
-        'src/data/parts/*.png',
     ]
     filenames = [fname for fnames in sources for fname in glob(fnames)]
 
     options = {'use_path': False}
+    if not isdir('data'):
+        mkdir('data')
+
     outname = 'data/theme'
     size = 4096
 
     ret = Atlas.create(outname, filenames, size, **options)
     if not ret:
-        print('Error while creating atlas!')
+        log.error('Error while creating atlas!')
         exit(1)
 
     fn, meta = ret
-    print('Atlas created at', fn)
-    print('%d image%s been created' % (len(meta),
+    log.info('Atlas created at', fn)
+    log.info('%d image%s been created' % (len(meta),
           's have' if len(meta) > 1 else ' has'))
 
 
 def bundle_kv():
+    '''Look through the source code, everywhere the load_kv() function
+    is called, inject the content of the kv file in place. If the python
+    code is then cythonize, it makes it that much harder to inspect and
+    modify the packaged program.
+    '''
     def get_kv_source(fn):
         kv = fn[:-2] + 'kv'
         with open(kv, encoding='utf8') as f:
@@ -107,46 +119,39 @@ def bundle_kv():
     for root, dirnames, filenames in walk('.'):
         for f in filenames:
             fn = join(root, f)
-            if f.endswith('.py'):
-                tmp, tmpname = mkstemp()
-                with open(fn, encoding='utf8') as source:
-                    found = False
-                    for line in source:
-                        if line.endswith('load_kv()\n'):
-                            found = True
-                            line = line.replace(
-                                'load_kv()', '{__INLINE_KV__}')
-                            write(
-                                tmp,
-                                b'from kivy.lang.builder import Builder\n')
-                            write(
-                                tmp,
-                                line.format(
-                                    __INLINE_KV__='Builder.load_string("""'
-                                ).encode('utf8')
-                            )
-                            write(
-                                tmp, get_kv_source(fn).encode('utf8')
-                            )
-                            write(tmp, b'""")')
-                        else:
-                            write(tmp, line.encode('utf8'))
-                close(tmp)
-                if found:
-                    unlink(fn)
-                    move(tmpname, fn)
-                    print("replaced {}".format(fn))
-                else:
-                    unlink(tmpname)
-                    print("skipped {}".format(fn))
+            if not f.endswith('.py'):
+                continue
+
+            tmp = tmpname = None
+            with open(fn, encoding='utf8') as source:
+                for line in source:
+                    if not line.endswith('load_kv()\n'):
+                        write(tmp, line.encode('utf8'))
+                        continue
+
+                    if not tmp:
+                        tmp, tmpname = mkstemp()
+
+                    write(tmp, b'from kivy.lang.builder import Builder\n')
+                    write(tmp, line.replace(
+                        'load_kv()', '{__INLINE_KV__}').format(
+                            __INLINE_KV__='Builder.load_string("""'
+                        ).encode('utf8'))
+                    write(tmp, get_kv_source(fn).encode('utf8'))
+                    write(tmp, b'""")')
+
+            close(tmp)
+            if tmp:
+                unlink(fn)
+                move(tmpname, fn)
+                log.info("replaced {}".format(fn))
+            else:
+                log.info("skipped {}".format(fn))
 
 
 if __name__ == '__main__':
+
     chdir('src')
-
-    with open('../packaging/version.txt') as f:
-        version = f.read().strip()
-
     condiment()
     bundle_kv()
     make_atlas()

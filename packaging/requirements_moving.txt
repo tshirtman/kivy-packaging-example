@@ -1,6 +1,6 @@
 PyInstaller
 https://github.com/tshirtman/condiment/archive/master.zip
 Pillow
-Cython==0.26
-kivy>=1.10.1
+Cython>=0.29
+kivy>=1.11.1
 jinja2
