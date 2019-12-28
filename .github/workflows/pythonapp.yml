@@ -25,6 +25,12 @@ jobs:
     - name: archive
       run: |
         tar -cjf application.tar.bz2 dist/*
+    - name: upload installer
+      uses: actions/upload-artifact@master
+      with:
+        name: Application.tar.bz2
+        path: dist/Application.tar.bz2
+
     # - name: Lint with flake8
     #   run: |
     #     pip install flake8
@@ -51,8 +57,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r packaging/requirements_moving.txt
         pip install -r packaging/requirements_windows.txt
-        iwr http://www.jrsoftware.org/download.php/is-unicode.exe?site=2 -OutFile is-unicode.exe
-        is-unicode.exe /ISP /VERYSILENT /SUPPRESSMSGBOXES /LANG=en
+        iwr http://www.jrsoftware.org/download.php/is.exe -OutFile is.exe
+        ./is.exe /ISP /VERYSILENT /SUPPRESSMSGBOXES /LANG=en
     - name: prepare code
       run: |
           python packaging/setup.py build_ext
@@ -61,7 +67,13 @@ jobs:
         python -m PyInstaller packaging/project.spec --clean -y
     - name: create installer
       run: |
-        "\Program Files (x86)\Inno Setup 5\ISCC.exe" packaging/project.iss
+        "\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging/project.iss
+
+    - name: upload installer
+      uses: actions/upload-artifact@master
+      with:
+        name: Application-setup.exe
+        path: dist/Application-setup.exe
 
     # - name: Lint with flake8
     #   run: |

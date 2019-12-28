@@ -123,14 +123,20 @@ def bundle_kv():
                 continue
 
             tmp = tmpname = None
+            start = ''
             with open(fn, encoding='utf8') as source:
                 for line in source:
                     if not line.endswith('load_kv()\n'):
-                        write(tmp, line.encode('utf8'))
+                        if tmp is None:
+                            start += line
+                        else:
+                            write(tmp, line.encode('utf8'))
                         continue
 
-                    if not tmp:
+                    if tmp is None:
                         tmp, tmpname = mkstemp()
+                        write(tmp, start.encode('utf8'))
+                        start = ''
 
                     write(tmp, b'from kivy.lang.builder import Builder\n')
                     write(tmp, line.replace(
@@ -140,8 +146,8 @@ def bundle_kv():
                     write(tmp, get_kv_source(fn).encode('utf8'))
                     write(tmp, b'""")')
 
-            close(tmp)
             if tmp:
+                close(tmp)
                 unlink(fn)
                 move(tmpname, fn)
                 log.info("replaced {}".format(fn))
